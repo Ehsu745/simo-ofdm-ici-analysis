@@ -1,0 +1,13 @@
+# MATLAB
+*.asv
+*.mat
+*.mexa64
+*.mexw64
+*.mexmaci64
+slprj/
+# macOS
+.DS_Store
+# 輸出圖檔（但保留 figures/ 內的成果圖）
+*.png
+*.fig
+!figures/*.png
