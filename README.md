@@ -1,4 +1,4 @@
-[English](README.md) | [繁體中文](README_zh.md)
+**English** | [繁體中文](README_zh.md)
 
 # SIMO-OFDM Simulation: From Project Fixes to Deep-Learning Equalization of Time-Varying Channel ICI
 
