@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+# 資料檔（大，不上傳）
+*.mat
+data/
+# 圖檔：忽略零散 png，但保留 figures/ 內成果圖
+*.png
+!figures/*.png
+# 系統
+.DS_Store
