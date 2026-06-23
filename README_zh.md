@@ -1,4 +1,4 @@
-[English](README.md) | [繁體中文](README_zh.md)
+[English](README.md) | **繁體中文**
 
 # SIMO-OFDM 模擬：從專題修正到時變通道 ICI 的深度學習等化
 
