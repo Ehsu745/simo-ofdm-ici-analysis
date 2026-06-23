@@ -1,123 +1,113 @@
-# SIMO-OFDM 模擬：從專題修正到時變通道 ICI 的深度學習等化
+[English](README.md) | [繁體中文](README_zh.md)
 
-本專案以一個 SIMO-OFDM（單發多收正交分頻多工）通訊系統模擬為基礎，
-記錄一條完整的研究演進：從**原始課堂專題的修正**，到**複現時變通道 ICI 問題**，
-再到**以深度學習（1D-CNN）等化器超越傳統方法**。
+# SIMO-OFDM Simulation: From Project Fixes to Deep-Learning Equalization of Time-Varying Channel ICI
 
-> 原始版本為大學專題成果（多接收天線 BER 模擬）。本 repo 先修正其雜訊建模與
-> 等化器實作的問題，接著引入時變通道、複現高移動性下 OFDM 子載波正交性被破壞
-> 而產生的載波間干擾（ICI），最後用 1D-CNN 學習 ICI 結構，在高都卜勒場景
-> 將 BER 相對 MMSE 大幅降低。
+This project builds on a SIMO-OFDM (single-input multiple-output orthogonal frequency-division multiplexing) communication-system simulation and documents a complete research progression: from **correcting an original course project**, to **reproducing the time-varying-channel ICI problem**, to **surpassing classical methods with a deep-learning (1D-CNN) equalizer**.
 
-> **深度學習等化器（C 階段）見 [`dnn/`](dnn/) 子資料夾。**
-> 核心成果：EbN0=20dB、fdTs=0.4 下，CNN 將 BER 從 MMSE 的 0.175 降至 0.087（約砍半）。
+> The original version was an undergraduate project (multi-receive-antenna BER simulation). This repo first corrects its noise-modeling and equalizer-implementation issues, then introduces a time-varying channel to reproduce the inter-carrier interference (ICI) that arises when high mobility breaks OFDM subcarrier orthogonality, and finally uses a 1D-CNN to learn the ICI structure and substantially lower the BER relative to MMSE in high-Doppler scenarios.
+
+> **The deep-learning equalizer (Stage C) is in the [`dnn/`](dnn/) subfolder.**
+> Headline result: at EbN0 = 20 dB and fdTs = 0.4, the CNN reduces BER from MMSE's 0.175 to 0.087 (roughly halved).
 
 ---
 
-## 系統模型
+## System Model
 
-單發射、多接收天線的 OFDM 系統：發射端經 S/P → IDFT → 加循環前綴（CP）→ P/S 發送；
-每根接收天線經過各自的多徑通道與雜訊，接收端去 CP → DFT → 等化 → 判別。
+A single-transmit, multiple-receive-antenna OFDM system: the transmitter goes through S/P → IDFT → cyclic prefix (CP) insertion → P/S; each receive antenna experiences its own multipath channel and noise; the receiver performs CP removal → DFT → equalization → detection.
 
-- 調變：QPSK
-- 子載波數 N、循環前綴長度 M、通道階數 L
-- 等化器：ZF / MMSE（可切換）/ 1D-CNN（C 階段）
-- 通道：靜態多徑 / 時變（都卜勒）
+- Modulation: QPSK
+- Number of subcarriers N, cyclic-prefix length M, channel order L
+- Equalizers: ZF / MMSE (switchable) / 1D-CNN (Stage C)
+- Channel: static multipath / time-varying (Doppler)
 
-實際參數值：
-- 多天線 BER 模擬（v2）：N = 8, M = 7, L = 5, P = 15, 接收天線數掃描 2–6
-- 時變通道 ICI 分析：N = 64, M = 16, L = 5, 歸一化都卜勒 fdTs 掃描 0–0.4
-
----
-
-## 研究演進四階段
-
-### 第一階段：原始專題（baseline）
-多接收天線下的 BER 模擬，驗證 BER 隨接收天線數增加而下降（空間分集增益）。
-
-### 第二階段：v2 修正
-修正原始程式在物理建模上的問題（詳見 `docs/FIXES.md`）：
-- 雜訊功率改用量測訊號功率（原用通道功率，物理定義錯誤）
-- 修正複數雜訊遺漏的因子 2
-- 等化器做成 ZF / MMSE 可切換（原程式實作與報告所述不符）
-- 每根天線獨立雜訊（原共用同一雜訊向量，高估分集增益）
-- 移除對不上系統的理論 BER 曲線；修正指數擬合的觸底退化
-
-數值驗證：BER 隨天線數遞減、MMSE 在低天線數優於 ZF。
-
-### 第三階段：時變通道 ICI 分析
-引入時變通道（都卜勒效應），複現 OFDM 在高移動性下的核心難題——ICI。
-- 兩種時變模型：簡化相位模型（教學）/ Jakes 模型（業界標準）
-- 三個產出：星座圖散開、子載波洩漏（dB 軸）、BER/ICI vs 歸一化都卜勒
-- 理論推導見 `docs/ICI_THEORY.md`
-- 開發中抓到並修正 CFO/ICI 混淆的建模錯誤（見 `docs/A_STAGE_NOTES.md`）
-
-### 第四階段：深度學習等化器（見 [`dnn/`](dnn/)）
-以 1D-CNN 學習 ICI 的鄰近子載波洩漏結構，在高都卜勒場景超越 ZF/MMSE。
-- 輸入鄰近子載波窗口，卷積核捕捉 ICI 帶狀結構
-- 高 SNR、強 ICI 下 BER 相對 MMSE 改善達 ~47%（砍半）
-- 改善幅度隨都卜勒增強而擴大
+Actual parameter values:
+- Multi-antenna BER simulation (v2): N = 8, M = 7, L = 5, P = 15, receive-antenna sweep 2–6
+- Time-varying-channel ICI analysis: N = 64, M = 16, L = 5, normalized Doppler fdTs sweep 0–0.4
 
 ---
 
-## 檔案結構
+## Four Stages of the Research Progression
+
+### Stage 1: Original project (baseline)
+Multi-receive-antenna BER simulation, verifying that BER decreases as the number of receive antennas increases (spatial diversity gain).
+
+### Stage 2: v2 corrections
+Fixes to physical-modeling issues in the original code (see `docs/FIXES.md`):
+- Noise power now based on measured signal power (the original used channel power — a physically incorrect definition)
+- Corrected the missing factor of 2 for complex noise
+- Made the equalizer switchable between ZF / MMSE (the original implementation did not match what the report described)
+- Independent noise per antenna (the original shared one noise vector, overestimating diversity gain)
+- Removed a theoretical BER curve that did not match the system; fixed the exponential-fit degeneration at the BER floor
+
+Numerical verification: BER decreases with antenna count; MMSE outperforms ZF at low antenna counts.
+
+### Stage 3: Time-varying-channel ICI analysis
+Introduces a time-varying channel (Doppler effect) to reproduce OFDM's core difficulty under high mobility — ICI.
+- Two time-varying models: a simplified phase model (instructional) and the Jakes model (industry standard)
+- Three outputs: constellation spreading, subcarrier leakage (dB axis), BER/ICI vs normalized Doppler
+- Theoretical derivation in `docs/ICI_THEORY.md`
+- A CFO/ICI modeling confusion was caught and corrected during development (see `docs/A_STAGE_NOTES.md`)
+
+### Stage 4: Deep-learning equalizer (see [`dnn/`](dnn/))
+Uses a 1D-CNN to learn the neighboring-subcarrier leakage structure of ICI, surpassing ZF/MMSE in high-Doppler scenarios.
+- Takes a neighboring-subcarrier window as input; convolution kernels capture the banded ICI structure
+- Under high SNR and strong ICI, BER improves by ~47% relative to MMSE (halved)
+- The improvement grows as Doppler increases
+
+---
+
+## File Structure
 
 ```
-src/                                    第二、三階段（MATLAB）
-  multiple_antenna_compare_MONTE_v2.m   主模擬（Monte Carlo BER vs 天線數，ZF/MMSE）
-  multiple_antenna_IQ_compare_v2.m      星座圖 + 單次 BER 觀察
-  timevarying_channel_ICI.m             時變通道 ICI 分析（三個 demo）
+src/                                    Stages 2 & 3 (MATLAB)
+  multiple_antenna_compare_MONTE_v2.m   Main simulation (Monte Carlo BER vs antennas, ZF/MMSE)
+  multiple_antenna_IQ_compare_v2.m      Constellation + single-run BER observation
+  timevarying_channel_ICI.m             Time-varying-channel ICI analysis (three demos)
 docs/
-  FIXES.md           v2 相對原始程式的逐項修正與原因
-  A_STAGE_NOTES.md   時變通道 ICI 階段筆記（含 CFO/ICI 除錯記錄）
-  ICI_THEORY.md      ICI 完整理論推導（正交性 → 時變破壞 → 矩陣形式）
-  REFERENCES.md      參考文獻與出處說明
-dnn/                                    第四階段（Python / PyTorch）
-  README.md          DNN 等化器說明與核心結果
-  src/               資料生成、CNN 訓練、fdTs 掃描、對照繪圖
-  docs/              C 階段筆記
-  figures/           成果圖
+  FIXES.md           Itemized v2 corrections vs the original code, with rationale
+  A_STAGE_NOTES.md   Time-varying-channel ICI notes (incl. CFO/ICI debugging record)
+  ICI_THEORY.md      Full ICI theory derivation (orthogonality → time-varying breakdown → matrix form)
+  REFERENCES.md      References and provenance notes
+dnn/                                    Stage 4 (Python / PyTorch)
+  README.md          DNN equalizer description and key results
+  src/               Data generation, CNN training, fdTs sweep, comparison plotting
+  docs/              Stage C notes
+  figures/           Result figures
 ```
 
 ---
 
-## 執行方式
+## How to Run
 
-MATLAB 部分（第二、三階段）：
+MATLAB parts (Stages 2 & 3):
 
 ```matlab
-run('src/multiple_antenna_compare_MONTE_v2.m')   % 多天線 BER（eq_type 可切 ZF/MMSE）
-run('src/multiple_antenna_IQ_compare_v2.m')      % 星座圖
-run('src/timevarying_channel_ICI.m')             % 時變通道 ICI（chan_mode 可切 phase/jakes）
+run('src/multiple_antenna_compare_MONTE_v2.m')   % Multi-antenna BER (eq_type switchable ZF/MMSE)
+run('src/multiple_antenna_IQ_compare_v2.m')      % Constellation
+run('src/timevarying_channel_ICI.m')             % Time-varying-channel ICI (chan_mode switchable phase/jakes)
 ```
 
-Python 部分（第四階段）：見 [`dnn/README.md`](dnn/README.md)。
+Python part (Stage 4): see [`dnn/README.md`](dnn/README.md).
 
 ---
 
-## 主要結果
+## Main Results
 
-- **空間分集**：BER 隨接收天線數增加而下降。
-- **等化器對比**：MMSE 在低訊雜比 / 低天線數時優於 ZF。
-- **ICI**：歸一化都卜勒增大時，星座圖散開、子載波旁瓣洩漏上升、BER 出現
-  不隨 SNR 消失的誤碼地板，驗證傳統單抽頭等化在高移動性下失效。
-- **深度學習等化**：1D-CNN 在高都卜勒、高 SNR 下將 BER 相對 MMSE 砍半，
-  且優勢隨 ICI 增強而擴大。
+- **Spatial diversity**: BER decreases as the number of receive antennas increases.
+- **Equalizer comparison**: MMSE outperforms ZF at low SNR / low antenna counts.
+- **ICI**: as normalized Doppler increases, the constellation spreads, subcarrier sidelobe leakage rises, and the BER develops a floor that does not vanish with SNR — confirming that classical single-tap equalization fails under high mobility.
+- **Deep-learning equalization**: the 1D-CNN halves BER relative to MMSE under high Doppler and high SNR, with the advantage growing as ICI strengthens.
 
 ---
 
-## 開發過程的技術反思
+## Technical Reflections from Development
 
-本專案各階段記錄了數個有價值的除錯案例（詳見對應 docs）：
+Each stage records valuable debugging cases (see the corresponding docs):
 
-1. **建模錯誤 vs 程式 bug**：原始雜訊模型語法正確、資料流自洽，
-   但物理定義錯誤（訊號功率項、複數因子 2）。
+1. **Modeling error vs program bug**: the original noise model was syntactically correct and self-consistent in data flow, but physically misdefined (signal-power term, complex factor of 2).
 
-2. **CFO 與 ICI 的混淆**：時變模型初版讓所有通道路徑同步旋轉，
-   等效於固定載波頻偏（CFO）而非 ICI。透過「子載波洩漏輕微但 BER 慘烈」
-   這個矛盾定位問題，改為各路徑獨立衰落後修正。
+2. **CFO vs ICI confusion**: the first time-varying model rotated all channel paths in phase together, equivalent to a fixed carrier frequency offset (CFO) rather than ICI. The problem was located through the contradiction "subcarrier leakage is mild but BER is catastrophic," then fixed by letting each path fade independently.
 
-3. **回歸 vs 分類**：DNN 等化器初版用 MSE 回歸，loss 正常下降但 BER 全錯——
-   等化的本質是判象限（分類）而非逼近數值（回歸），改交叉熵後修正。
+3. **Regression vs classification**: the first DNN equalizer used MSE regression — the loss decreased normally but BER was entirely wrong. Equalization is fundamentally a quadrant-decision (classification) task, not a value-approximation (regression) one; switching to cross-entropy fixed it.
 
-三者是同一類除錯智慧：當兩個本該一致的指標矛盾時，矛盾本身就是定位問題的線索。
+All three reflect the same debugging insight: when two metrics that should agree contradict each other, the contradiction itself is the clue that locates the problem.
