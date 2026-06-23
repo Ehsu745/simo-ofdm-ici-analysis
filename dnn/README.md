@@ -1,123 +1,112 @@
-# SIMO-OFDM 模擬：從專題修正到時變通道 ICI 的深度學習等化
+# DNN 等化器：用 1D-CNN 對抗時變通道 ICI
 
-本專案以一個 SIMO-OFDM（單發多收正交分頻多工）通訊系統模擬為基礎，
-記錄一條完整的研究演進：從**原始課堂專題的修正**，到**複現時變通道 ICI 問題**，
-再到**以深度學習（1D-CNN）等化器超越傳統方法**。
+本資料夾是 SIMO-OFDM 專案的延伸（C 階段）：在時變通道（都卜勒效應）下，
+傳統 ZF/MMSE 等化器因載波間干擾（ICI）而失效，本階段以深度學習方法
+（1D-CNN）學習 ICI 的鄰近子載波洩漏結構，在高都卜勒場景超越傳統等化。
 
-> 原始版本為大學專題成果（多接收天線 BER 模擬）。本 repo 先修正其雜訊建模與
-> 等化器實作的問題，接著引入時變通道、複現高移動性下 OFDM 子載波正交性被破壞
-> 而產生的載波間干擾（ICI），最後用 1D-CNN 學習 ICI 結構，在高都卜勒場景
-> 將 BER 相對 MMSE 大幅降低。
-
-> **深度學習等化器（C 階段）見 [`dnn/`](dnn/) 子資料夾。**
-> 核心成果：EbN0=20dB、fdTs=0.4 下，CNN 將 BER 從 MMSE 的 0.175 降至 0.087（約砍半）。
+> **核心結果**：在 EbN0=20dB、歸一化都卜勒 fdTs=0.4 的壓力測試下，
+> CNN 將 BER 從 MMSE 的 0.175 降至 0.087（**約砍半，改善 47%**），
+> 且改善幅度隨都卜勒增強而擴大。
 
 ---
 
-## 系統模型
+## 方法
 
-單發射、多接收天線的 OFDM 系統：發射端經 S/P → IDFT → 加循環前綴（CP）→ P/S 發送；
-每根接收天線經過各自的多徑通道與雜訊，接收端去 CP → DFT → 等化 → 判別。
+ICI 在頻域上表現為通道矩陣的非對角項——能量從一個子載波洩漏到鄰近子載波
+（帶狀矩陣結構，理論見上層 `docs/ICI_THEORY.md`）。據此：
 
-- 調變：QPSK
-- 子載波數 N、循環前綴長度 M、通道階數 L
-- 等化器：ZF / MMSE（可切換）/ 1D-CNN（C 階段）
-- 通道：靜態多徑 / 時變（都卜勒）
+- **輸入**：每個中心子載波 + 左右各 W 個鄰居（窗口 2W+1），
+  每點 4 特徵 [Re(y), Im(y), Re(d), Im(d)]
+- **網路**：3 層 1D 卷積（kernel=3）+ 全連接頭
+- **輸出**：中心子載波的 QPSK 類別（4 類分類，交叉熵）
+- **設計依據**：CNN 卷積核天生「看鄰居」，能捕捉 ICI 的帶狀洩漏結構——
+  這是單點 MLP 做不到的。方法選擇參考主流文獻（1D-CNN 在時變通道
+  優於 LS/MMSE/FFNN）。
 
-實際參數值：
-- 多天線 BER 模擬（v2）：N = 8, M = 7, L = 5, P = 15, 接收天線數掃描 2–6
-- 時變通道 ICI 分析：N = 64, M = 16, L = 5, 歸一化都卜勒 fdTs 掃描 0–0.4
-
----
-
-## 研究演進四階段
-
-### 第一階段：原始專題（baseline）
-多接收天線下的 BER 模擬，驗證 BER 隨接收天線數增加而下降（空間分集增益）。
-
-### 第二階段：v2 修正
-修正原始程式在物理建模上的問題（詳見 `docs/FIXES.md`）：
-- 雜訊功率改用量測訊號功率（原用通道功率，物理定義錯誤）
-- 修正複數雜訊遺漏的因子 2
-- 等化器做成 ZF / MMSE 可切換（原程式實作與報告所述不符）
-- 每根天線獨立雜訊（原共用同一雜訊向量，高估分集增益）
-- 移除對不上系統的理論 BER 曲線；修正指數擬合的觸底退化
-
-數值驗證：BER 隨天線數遞減、MMSE 在低天線數優於 ZF。
-
-### 第三階段：時變通道 ICI 分析
-引入時變通道（都卜勒效應），複現 OFDM 在高移動性下的核心難題——ICI。
-- 兩種時變模型：簡化相位模型（教學）/ Jakes 模型（業界標準）
-- 三個產出：星座圖散開、子載波洩漏（dB 軸）、BER/ICI vs 歸一化都卜勒
-- 理論推導見 `docs/ICI_THEORY.md`
-- 開發中抓到並修正 CFO/ICI 混淆的建模錯誤（見 `docs/A_STAGE_NOTES.md`）
-
-### 第四階段：深度學習等化器（見 [`dnn/`](dnn/)）
-以 1D-CNN 學習 ICI 的鄰近子載波洩漏結構，在高都卜勒場景超越 ZF/MMSE。
-- 輸入鄰近子載波窗口，卷積核捕捉 ICI 帶狀結構
-- 高 SNR、強 ICI 下 BER 相對 MMSE 改善達 ~47%（砍半）
-- 改善幅度隨都卜勒增強而擴大
-
----
-
-## 檔案結構
-
-```
-src/                                    第二、三階段（MATLAB）
-  multiple_antenna_compare_MONTE_v2.m   主模擬（Monte Carlo BER vs 天線數，ZF/MMSE）
-  multiple_antenna_IQ_compare_v2.m      星座圖 + 單次 BER 觀察
-  timevarying_channel_ICI.m             時變通道 ICI 分析（三個 demo）
-docs/
-  FIXES.md           v2 相對原始程式的逐項修正與原因
-  A_STAGE_NOTES.md   時變通道 ICI 階段筆記（含 CFO/ICI 除錯記錄）
-  ICI_THEORY.md      ICI 完整理論推導（正交性 → 時變破壞 → 矩陣形式）
-  REFERENCES.md      參考文獻與出處說明
-dnn/                                    第四階段（Python / PyTorch）
-  README.md          DNN 等化器說明與核心結果
-  src/               資料生成、CNN 訓練、fdTs 掃描、對照繪圖
-  docs/              C 階段筆記
-  figures/           成果圖
-```
-
----
-
-## 執行方式
-
-MATLAB 部分（第二、三階段）：
-
-```matlab
-run('src/multiple_antenna_compare_MONTE_v2.m')   % 多天線 BER（eq_type 可切 ZF/MMSE）
-run('src/multiple_antenna_IQ_compare_v2.m')      % 星座圖
-run('src/timevarying_channel_ICI.m')             % 時變通道 ICI（chan_mode 可切 phase/jakes）
-```
-
-Python 部分（第四階段）：見 [`dnn/README.md`](dnn/README.md)。
+採用 model-aided 設定（將通道估計 d 餵給網路），與 MMSE 公平對比。
 
 ---
 
 ## 主要結果
 
-- **空間分集**：BER 隨接收天線數增加而下降。
-- **等化器對比**：MMSE 在低訊雜比 / 低天線數時優於 ZF。
-- **ICI**：歸一化都卜勒增大時，星座圖散開、子載波旁瓣洩漏上升、BER 出現
-  不隨 SNR 消失的誤碼地板，驗證傳統單抽頭等化在高移動性下失效。
-- **深度學習等化**：1D-CNN 在高都卜勒、高 SNR 下將 BER 相對 MMSE 砍半，
-  且優勢隨 ICI 增強而擴大。
+### 成果圖
+
+ZF / MMSE / CNN 隨歸一化都卜勒的 BER 對比（EbN0=20dB，CNN 在高都卜勒砍半）：
+
+![主成果圖](figures/sweep_20dB.png)
+
+兩種 SNR 下 CNN 相對 MMSE 的優勢對比（高 SNR 下差距更大）：
+
+![雙 SNR 對照](figures/compare_10_20dB.png)
+
+### CNN vs MMSE（EbN0=20dB）
+
+| fdTs | MMSE | CNN | 改善 |
+|------|------|-----|------|
+| 0.10 | 1.80e-2 | 1.43e-2 | +21% |
+| 0.20 | 5.72e-2 | 3.45e-2 | +40% |
+| 0.30 | 1.11e-1 | 6.18e-2 | +44% |
+| 0.40 | 1.75e-1 | 9.24e-2 | +47% |
+
+關鍵觀察：
+1. **CNN 優勢專屬於 ICI 場景**：fdTs≈0（無 ICI）時 CNN 略輸 MMSE，
+   證明方法的誠實性——不在不該贏時假裝贏。
+2. **SNR 是關鍵槓桿**：高 SNR 下雜訊不再主導、ICI 成為唯一誤差來源，
+   CNN 對 ICI 的優勢更純粹顯現（同樣 fdTs，20dB 的改善遠大於 10dB）。
+3. **改善隨都卜勒擴大**：ICI 越強，CNN 越把 MMSE 甩開。
+
+---
+
+## 檔案
+
+```
+src/
+  gen_data.py      OFDM 資料生成器，產 (Y,D,X) 三元組存 .mat（static/jakes，可設 fdTs）
+  train_eq.py      里程碑1：靜態通道 MLP 等化器（驗證 pipeline，追平 MMSE）
+  train_cnn.py     里程碑2：時變通道 1D-CNN 等化器（單點 fdTs 對比）
+  sweep_fdts.py    掃多個 fdTs，產 ZF/MMSE/CNN 三線分岔圖
+  plot_compare.py  把兩組 sweep 結果畫成雙 SNR 對照圖
+docs/
+  C_STAGE_NOTES.md C 階段完整筆記（方法、結果、除錯記錄）
+figures/
+  sweep_20dB.png        主成果圖
+  compare_10_20dB.png   雙 SNR 對照圖
+```
+
+---
+
+## 執行（需 PyTorch + CUDA）
+
+```bash
+# 里程碑 1：靜態通道，驗證 pipeline
+python gen_data.py --mode static --out data/static.mat
+python train_eq.py --data data/static.mat --epochs 15
+
+# 里程碑 2：時變通道單點對比
+python gen_data.py --mode jakes --fdTs 0.2 --out data/jakes02.mat
+python train_cnn.py --data data/jakes02.mat --W 4 --epochs 25
+
+# 完整掃描 + 對照圖
+python sweep_fdts.py --fdts 0 0.1 0.2 0.3 0.4 --epochs 50 --EbN0 20 --out sweep_20dB.mat
+python sweep_fdts.py --fdts 0 0.1 0.2 0.3 0.4 --epochs 50 --EbN0 10 --out sweep_10dB.mat
+python plot_compare.py --a sweep_10dB.mat --b sweep_20dB.mat --la 10dB --lb 20dB --out compare_10_20dB.png
+```
 
 ---
 
 ## 開發過程的技術反思
 
-本專案各階段記錄了數個有價值的除錯案例（詳見對應 docs）：
+**MSE vs 分類的建模選擇**：初版用 MSE 回歸，loss 正常下降但 BER 全錯——
+網路輸出數值接近目標卻判別象限全錯。根因是等化的本質是「判對象限」=分類問題，
+非「逼近數值」=回歸。改交叉熵分類後立刻正常。
 
-1. **建模錯誤 vs 程式 bug**：原始雜訊模型語法正確、資料流自洽，
-   但物理定義錯誤（訊號功率項、複數因子 2）。
+這與專案其他階段的除錯是同一類智慧：當兩個本該一致的指標矛盾時
+（loss 降但 BER 全錯），矛盾本身就是定位問題的線索。
 
-2. **CFO 與 ICI 的混淆**：時變模型初版讓所有通道路徑同步旋轉，
-   等效於固定載波頻偏（CFO）而非 ICI。透過「子載波洩漏輕微但 BER 慘烈」
-   這個矛盾定位問題，改為各路徑獨立衰落後修正。
+---
 
-3. **回歸 vs 分類**：DNN 等化器初版用 MSE 回歸，loss 正常下降但 BER 全錯——
-   等化的本質是判象限（分類）而非逼近數值（回歸），改交叉熵後修正。
+## 場景說明
 
-三者是同一類除錯智慧：當兩個本該一致的指標矛盾時，矛盾本身就是定位問題的線索。
+fdTs=0.3~0.4 屬壓力測試場景（接近高鐵/高速移動的都卜勒上限或略超），
+物理上合理、學界有模擬此範圍，但非典型行動通訊條件。
+此設定用於凸顯 CNN 對強 ICI 的處理能力。
