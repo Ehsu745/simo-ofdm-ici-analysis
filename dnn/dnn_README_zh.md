@@ -1,4 +1,4 @@
-[English](README.md) | [繁體中文](README_zh.md)
+[English](README.md) | **繁體中文**
 
 # DNN 等化器：用 1D-CNN 對抗時變通道 ICI
 
