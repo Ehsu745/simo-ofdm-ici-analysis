@@ -1,4 +1,4 @@
-[English](README.md) | [繁體中文](README_zh.md)
+**English** | [繁體中文](README_zh.md)
 
 # DNN Equalizer: Combating Time-Varying-Channel ICI with a 1D-CNN
 
